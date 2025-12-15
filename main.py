@@ -4,12 +4,17 @@ from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import List, Optional
+import os
+from dotenv import load_dotenv
 
 import feedparser
 import re 
 from googletrans import Translator
 import requests 
 from collections import Counter # 출처 빈도수 계산을 위한 라이브러리 추가
+
+# .env 파일 로드
+load_dotenv()
 
 # --- (이전 코드와 동일: NewsArticle 모델 정의, Translator 객체 초기화) ---
 class NewsArticle(BaseModel):
@@ -19,6 +24,76 @@ class NewsArticle(BaseModel):
     summary: Optional[str] = None 
 
 translator = Translator()
+
+# .env에서 텔레그램 설정 로드
+TELEGRAM_BOT_TOKEN = os.getenv('telegram_bot_token')
+TELEGRAM_CHAT_ID = os.getenv('telegram_chat_id')
+
+
+# --- 텔레그램 메시지 전송 함수 ---
+def send_telegram_message(message: str) -> bool:
+    """
+    텔레그램으로 메시지를 전송합니다.
+    
+    Args:
+        message: 전송할 메시지 내용
+    
+    Returns:
+        성공 시 True, 실패 시 False
+    """
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("❌ 텔레그램 설정이 없습니다. .env 파일을 확인하세요.")
+        return False
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML"  # HTML 포맷 지원 (마크다운도 가능: "Markdown")
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        
+        if response.status_code == 200:
+            print("✅ 텔레그램 메시지 전송 성공!")
+            return True
+        else:
+            print(f"❌ 텔레그램 전송 실패: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ 텔레그램 메시지 전송 중 오류 발생: {e}")
+        return False
+
+
+def send_news_to_telegram(news: List[NewsArticle]) -> bool:
+    """
+    수집한 뉴스를 텔레그램으로 전송합니다.
+    
+    Args:
+        news: 뉴스 기사 리스트
+    
+    Returns:
+        성공 시 True, 실패 시 False
+    """
+    if not news or news[0].url == '#':
+        message = "🚨 뉴스 수집에 실패했습니다. 나중에 다시 시도해주세요."
+        return send_telegram_message(message)
+    
+    # 메시지 포맷 구성
+    message = "<b>📰 AI 뉴스 스크랩 (최신 10개)</b>\n\n"
+    
+    for idx, article in enumerate(news, 1):
+        message += f"<b>{idx}. {article.title}</b>\n"
+        message += f"출처: {article.source}\n"
+        if article.summary:
+            message += f"요약: {article.summary}\n"
+        message += f"링크: <a href='{article.url}'>기사 보기</a>\n"
+        message += "─" * 40 + "\n"
+    
+    return send_telegram_message(message)
 
 
 # --- 2. RSS 피드 파싱 및 번역 로직 구현 (변경 없음) ---
@@ -140,3 +215,16 @@ async def news_webpage(request: Request):
 @app.get("/api/news", response_model=List[NewsArticle], summary="뉴스 데이터 (JSON) 반환")
 async def get_latest_news_api():
     return parse_rss_feed()
+
+@app.get("/api/send-telegram", summary="뉴스를 텔레그램으로 전송")
+async def send_news_telegram():
+    """
+    수집한 최신 뉴스를 텔레그램 채팅으로 전송합니다.
+    """
+    news = parse_rss_feed()
+    success = send_news_to_telegram(news)
+    
+    return {
+        "status": "success" if success else "failed",
+        "message": "뉴스가 텔레그램으로 전송되었습니다!" if success else "텔레그램 전송에 실패했습니다."
+    }

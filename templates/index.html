@@ -113,11 +113,66 @@
             padding: 0;
             margin: 0;
         }
+
+        /* 텔레그램 버튼 스타일 */
+        .telegram-button {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #0088cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+        .telegram-button:hover {
+            background-color: #006ba3;
+        }
+        .telegram-button:active {
+            transform: scale(0.98);
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .status-message {
+            text-align: center;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>{{ title }}</h1>
+        
+        <!-- 📱 텔레그램 전송 버튼 추가 -->
+        <div class="button-container">
+            <button class="telegram-button" onclick="sendToTelegram()">
+                📱 뉴스를 텔레그램으로 전송
+            </button>
+        </div>
+        
+        <!-- 상태 메시지 표시 -->
+        <div id="statusMessage" class="status-message"></div>
 
         {% if news and news[0].url != '#' %}
             {% for article in news %}
@@ -144,5 +199,43 @@
         {% endif %}
 
     </div>
+
+    <!-- 📱 텔레그램 전송 JavaScript 함수 -->
+    <script>
+        async function sendToTelegram() {
+            const button = document.querySelector('.telegram-button');
+            const statusDiv = document.getElementById('statusMessage');
+            
+            // 버튼 비활성화
+            button.disabled = true;
+            button.textContent = '📤 전송 중...';
+            statusDiv.className = 'status-message';
+            
+            try {
+                const response = await fetch('/api/send-telegram');
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'success') {
+                    statusDiv.className = 'status-message success';
+                    statusDiv.textContent = '✅ ' + data.message;
+                } else {
+                    statusDiv.className = 'status-message error';
+                    statusDiv.textContent = '❌ ' + data.message;
+                }
+            } catch (error) {
+                statusDiv.className = 'status-message error';
+                statusDiv.textContent = '❌ 전송 중 오류가 발생했습니다: ' + error.message;
+            } finally {
+                // 버튼 활성화
+                button.disabled = false;
+                button.textContent = '📱 뉴스를 텔레그램으로 전송';
+                
+                // 3초 후 메시지 숨기기
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+    </script>
 </body>
 </html>

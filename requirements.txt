@@ -2,6 +2,7 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.0
 beautifulsoup4==4.14.3
+python-dotenv==1.0.1
 certifi==2025.11.12
 chardet==3.0.4
 charset-normalizer==3.4.4
