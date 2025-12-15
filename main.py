@@ -6,17 +6,17 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 import feedparser
 import re 
 from googletrans import Translator
 import requests 
-from collections import Counter # 출처 빈도수 계산을 위한 라이브러리 추가
+from collections import Counter
 
 # .env 파일 로드
 load_dotenv()
 
-# --- (이전 코드와 동일: NewsArticle 모델 정의, Translator 객체 초기화) ---
 class NewsArticle(BaseModel):
     title: str
     url: str
@@ -29,6 +29,35 @@ translator = Translator()
 TELEGRAM_BOT_TOKEN = os.getenv('telegram_bot_token')
 TELEGRAM_CHAT_ID = os.getenv('telegram_chat_id')
 
+# 🌟 캐시 시스템 추가
+class NewsCache:
+    def __init__(self):
+        self.data: List[NewsArticle] = []
+        self.last_updated: Optional[datetime] = None
+        self.cache_duration = timedelta(hours=1)  # 1시간 캐시 유지
+    
+    def is_expired(self) -> bool:
+        """캐시가 만료되었는지 확인"""
+        if self.last_updated is None:
+            return True
+        return datetime.now() - self.last_updated > self.cache_duration
+    
+    def get(self) -> List[NewsArticle]:
+        """캐시된 데이터 반환"""
+        return self.data
+    
+    def update(self, news: List[NewsArticle]):
+        """캐시 업데이트"""
+        self.data = news
+        self.last_updated = datetime.now()
+    
+    def clear(self):
+        """캐시 초기화"""
+        self.data = []
+        self.last_updated = None
+
+# 캐시 인스턴스 생성
+news_cache = NewsCache()
 
 # --- 텔레그램 메시지 전송 함수 ---
 def send_telegram_message(message: str) -> bool:
@@ -202,29 +231,53 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", summary="뉴스 웹 페이지 표시")
 async def news_webpage(request: Request):
-    news = parse_rss_feed() 
+    # 🌟 캐시 확인 및 업데이트
+    if news_cache.is_expired():
+        news = parse_rss_feed()
+        news_cache.update(news)
+    else:
+        news = news_cache.get()
     
-    # 🌟 추가: 종합 분석 내용 생성
     analysis_text = analyze_news_data(news)
 
     return templates.TemplateResponse(
         "index.html", 
-        {"request": request, "news": news, "title": "인공지능 (AI) 번역 뉴스", "analysis": analysis_text} # 템플릿에 분석 내용 전달
+        {"request": request, "news": news, "title": "인공지능 (AI) 번역 뉴스", "analysis": analysis_text}
     )
 
 @app.get("/api/news", response_model=List[NewsArticle], summary="뉴스 데이터 (JSON) 반환")
 async def get_latest_news_api():
-    return parse_rss_feed()
+    if news_cache.is_expired():
+        news = parse_rss_feed()
+        news_cache.update(news)
+    else:
+        news = news_cache.get()
+    return news
 
 @app.get("/api/send-telegram", summary="뉴스를 텔레그램으로 전송")
 async def send_news_telegram():
     """
     수집한 최신 뉴스를 텔레그램 채팅으로 전송합니다.
+    🌟 전송 후 캐시를 초기화하여 새로운 기사를 가져옵니다.
     """
-    news = parse_rss_feed()
+    if news_cache.is_expired():
+        news = parse_rss_feed()
+        news_cache.update(news)
+    else:
+        news = news_cache.get()
+    
     success = send_news_to_telegram(news)
+    
+    # 🌟 텔레그램 전송 성공 후 캐시 초기화
+    if success:
+        news_cache.clear()
+        print("✅ 캐시가 초기화되었습니다. 다음 요청 시 새로운 뉴스가 갱신됩니다.")
     
     return {
         "status": "success" if success else "failed",
-        "message": "뉴스가 텔레그램으로 전송되었습니다!" if success else "텔레그램 전송에 실패했습니다."
+        "message": "뉴스가 텔레그램으로 전송되었습니다! 🔄 새로운 뉴스가 준비 중입니다." if success else "텔레그램 전송에 실패했습니다."
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
