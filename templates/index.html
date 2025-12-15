@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body { 
+            font-family: 'Malgun Gothic', 'Arial', sans-serif; 
+            line-height: 1.6; 
+            padding: 20px; 
+            background-color: #f0f2f5; 
+        }
+        .container { 
+            max-width: 900px; 
+            margin: auto; 
+            padding: 20px; 
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center; 
+            border-bottom: 3px solid #3498db; 
+            padding-bottom: 15px; 
+            margin-bottom: 30px; 
+        }
+        
+        /* 뉴스 기사 카드 스타일 */
+        .article {
+            margin-bottom: 25px;
+            padding: 20px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: transform 0.2s;
+        }
+        .article:hover {
+            transform: translateY(-3px);
+        }
+        
+        .article h2 { 
+            margin-top: 0; 
+            font-size: 1.6em; 
+            margin-bottom: 10px;
+        }
+        .article a { 
+            text-decoration: none; 
+            color: #34495e; 
+            font-weight: bold;
+        }
+        .article a:hover { 
+            color: #2980b9; 
+        }
+        
+        .source { 
+            font-size: 0.9em; 
+            color: #7f8c8d; 
+            margin-bottom: 15px;
+            display: block;
+        } 
+        
+        .summary { 
+            color: #34495e; 
+            font-size: 1em; 
+            margin-top: 10px;
+            margin-bottom: 15px;
+        }
+        
+        /* 원본 링크 버튼 스타일 */
+        .read-more {
+            display: inline-block;
+            padding: 8px 15px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: normal;
+            transition: background-color 0.2s;
+        }
+        .read-more:hover {
+            background-color: #2980b9;
+        }
+
+        /* 오류 메시지 스타일 */
+        .error { 
+            color: #e74c3c; 
+            text-align: center; 
+            padding: 20px; 
+            border: 1px dashed #e74c3c; 
+            border-radius: 5px; 
+        }
+        
+        /* 종합 분석 섹션 스타일 */
+        .analysis-container {
+            margin-top: 50px;
+            padding: 25px;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            background-color: #ecf0f1;
+        }
+        .analysis-container h2 {
+            color: #3498db;
+            border-bottom: 2px dashed #bdc3c7;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .analysis-text {
+            white-space: pre-wrap; /* 줄바꿈을 유지하여 분석 내용 표시 */
+            font-family: 'Malgun Gothic', 'Arial', sans-serif;
+            font-size: 1em;
+            color: #2c3e50;
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ title }}</h1>
+
+        {% if news and news[0].url != '#' %}
+            {% for article in news %}
+                <div class="article">
+                    <h2><a href="{{ article.url }}" target="_blank">{{ article.title }}</a></h2>
+                    <span class="source">출처: {{ article.source }}</span>
+                    
+                    {% if article.summary %}
+                        <p class="summary">{{ article.summary }}</p>
+                    {% endif %}
+
+                    <a href="{{ article.url }}" target="_blank" class="read-more">기사 원본 보기 &rarr;</a>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="error">RSS 피드에서 뉴스를 가져오는 데 실패했습니다. 코드를 확인하거나 다른 RSS 주소를 시도해 보세요.</p>
+        {% endif %}
+
+        {% if analysis %}
+            <div class="analysis-container">
+                <h2>📊 10개 기사 종합 분석</h2>
+                <pre class="analysis-text">{{ analysis }}</pre>
+            </div>
+        {% endif %}
+
+    </div>
+</body>
+</html>
